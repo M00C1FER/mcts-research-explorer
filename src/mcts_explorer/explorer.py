@@ -73,16 +73,19 @@ class MCTSResearchExplorer:
 
     def __init__(
         self,
-        search_fn: Callable[[str], List[Dict[str, Any]]],
+        search_fn: Optional[Callable[[str], List[Dict[str, Any]]]] = None,
         expand_fn: Optional[Callable[[str, List[Dict]], List[str]]] = None,
         score_fn: Optional[Callable[[Dict[str, Any]], float]] = None,
         max_nodes: int = 200,
         max_depth: int = 4,
         prune_threshold: float = 0.40,
+        fetcher: Optional[Callable[[str], List[Dict[str, Any]]]] = None,
+        max_iterations: Optional[int] = None,
     ):
         """
         Args:
             search_fn: Function(query) -> List[results]. Executes search.
+            fetcher: Alias for search_fn (convenience parameter).
             expand_fn: Function(query, results) -> List[new_queries]. Generates child queries.
                        If None, uses simple keyword expansion.
             score_fn: Function(result) -> float. Scores result quality (CRAAP).
@@ -90,8 +93,14 @@ class MCTSResearchExplorer:
             max_nodes: Maximum nodes in tree (RAM bound).
             max_depth: Maximum tree depth.
             prune_threshold: Nodes with avg_quality below this are pruned.
+            max_iterations: Default budget for explore() when budget not specified.
         """
+        if search_fn is None and fetcher is not None:
+            search_fn = fetcher
+        if search_fn is None:
+            raise ValueError("search_fn or fetcher must be provided")
         self.search_fn = search_fn
+        self._default_budget: int = max_iterations if max_iterations is not None else 50
         self.expand_fn = expand_fn or self._default_expand
         self.score_fn = score_fn or self._default_score
         self.max_nodes = max_nodes
@@ -104,7 +113,7 @@ class MCTSResearchExplorer:
         self.seen_urls: set = set()
         self.seen_queries: set = set()
 
-    def explore(self, topic: str, budget: int = 50,
+    def explore(self, topic: str, budget: Optional[int] = None,
                 initial_queries: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Run MCTS exploration on a topic.
@@ -124,6 +133,8 @@ class MCTSResearchExplorer:
             }
         """
         start = time.monotonic()
+        if budget is None:
+            budget = self._default_budget
 
         # Initialize root
         self.root = MCTSNode(query=topic, depth=0)
