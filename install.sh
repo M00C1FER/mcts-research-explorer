@@ -72,6 +72,8 @@ case "$PLATFORM" in
                 sudo dnf install -y python3 python3-pip
             elif command -v pacman &>/dev/null; then
                 sudo pacman -Sy --noconfirm python python-pip
+            elif command -v apk &>/dev/null; then
+                sudo apk add --no-cache python3 py3-pip
             else
                 error "No supported package manager. Install Python 3.8+ manually."
             fi
