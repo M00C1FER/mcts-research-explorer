@@ -37,23 +37,31 @@ class MCTSNode:
 
     # MCTS statistics
     visits: int = 0
-    quality_sum: float = 0.0  # Sum of CRAAP scores from this subtree
-    avg_quality: float = 0.0  # quality_sum / visits
+    quality_sum: float = 0.0  # Sum of CRAAP scores from this node's own results
+    avg_quality: float = 0.0  # Weighted-average quality for UCB1 / pruning
 
     # Metadata
     depth: int = 0
     expanded: bool = False
     pruned: bool = False
 
+    # Exploration constant — set by MCTSResearchExplorer at node-creation time.
+    # Stored per-node so UCB1 requires no external reference.
+    c: float = field(default=1.414, repr=False)
+
     @property
     def ucb1(self) -> float:
-        """Upper Confidence Bound 1 score for node selection."""
+        """Upper Confidence Bound 1 score for node selection.
+
+        Returns +inf for unvisited nodes so they are always selected first.
+        Uses ``max(parent_visits, 1)`` to guard against log(0) when the parent
+        itself has not yet been visited.
+        """
         if self.visits == 0:
             return float('inf')  # Unexplored nodes have infinite priority
-        C = 1.414  # Exploration constant (sqrt(2))
         parent_visits = self.parent.visits if self.parent else self.visits
         exploitation = self.avg_quality
-        exploration = C * math.sqrt(math.log(max(parent_visits, 1)) / self.visits)
+        exploration = self.c * math.sqrt(math.log(max(parent_visits, 1)) / self.visits)
         return exploitation + exploration
 
 
@@ -81,6 +89,7 @@ class MCTSResearchExplorer:
         prune_threshold: float = 0.40,
         fetcher: Optional[Callable[[str], List[Dict[str, Any]]]] = None,
         max_iterations: Optional[int] = None,
+        exploration_constant: float = 1.414,
     ):
         """
         Args:
@@ -94,6 +103,8 @@ class MCTSResearchExplorer:
             max_depth: Maximum tree depth.
             prune_threshold: Nodes with avg_quality below this are pruned.
             max_iterations: Default budget for explore() when budget not specified.
+            exploration_constant: UCB1 exploration weight C (default sqrt(2) ≈ 1.414).
+                Higher values favour exploration; lower values favour exploitation.
         """
         if search_fn is None and fetcher is not None:
             search_fn = fetcher
@@ -106,6 +117,7 @@ class MCTSResearchExplorer:
         self.max_nodes = max_nodes
         self.max_depth = max_depth
         self.prune_threshold = prune_threshold
+        self.exploration_constant = exploration_constant
 
         self.root: Optional[MCTSNode] = None
         self.node_count = 0
@@ -137,7 +149,7 @@ class MCTSResearchExplorer:
             budget = self._default_budget
 
         # Initialize root
-        self.root = MCTSNode(query=topic, depth=0)
+        self.root = MCTSNode(query=topic, depth=0, c=self.exploration_constant)
         self.node_count = 1
         self.seen_queries.add(topic.lower())
 
@@ -145,7 +157,8 @@ class MCTSResearchExplorer:
         if initial_queries:
             for q in initial_queries:
                 if q.lower() not in self.seen_queries:
-                    child = MCTSNode(query=q, parent=self.root, depth=1)
+                    child = MCTSNode(query=q, parent=self.root, depth=1,
+                                     c=self.exploration_constant)
                     self.root.children.append(child)
                     self.node_count += 1
                     self.seen_queries.add(q.lower())
@@ -156,6 +169,7 @@ class MCTSResearchExplorer:
             # 1. SELECT — find most promising unexplored node
             node = self._select(self.root)
             if node is None:
+                logger.debug("MCTS: all branches exhausted or pruned — stopping early")
                 break  # No more expandable nodes
 
             # 2. EXPAND — generate child queries from this node's results
@@ -263,13 +277,20 @@ class MCTSResearchExplorer:
                 break
             q_lower = q.lower().strip()
             if q_lower and q_lower not in self.seen_queries:
-                child = MCTSNode(query=q, parent=node, depth=node.depth + 1)
+                child = MCTSNode(query=q, parent=node, depth=node.depth + 1,
+                                 c=self.exploration_constant)
                 node.children.append(child)
                 self.node_count += 1
                 self.seen_queries.add(q_lower)
 
     def _backpropagate(self, node: MCTSNode):
-        """Update quality scores from leaf to root."""
+        """Update quality scores from leaf to root.
+
+        Each ancestor's avg_quality is a weighted average of its own simulation
+        quality and its children's accumulated quality.  Using ``avg_quality``
+        (already normalised to [0, 1]) rather than the raw ``quality_sum``
+        (which scales with result_count) prevents the average from exceeding 1.
+        """
         current = node
         while current is not None:
             if current.children:
@@ -278,8 +299,11 @@ class MCTSResearchExplorer:
                 if child_visits > 0:
                     own_weight = max(current.visits, 1)
                     total_weight = own_weight + child_visits
+                    # Use avg_quality (clamped to [0,1]) rather than quality_sum
+                    # (which scales with result_count and can exceed 1.0 when a
+                    # node has several results).
                     current.avg_quality = (
-                        (current.quality_sum + child_quality) / total_weight
+                        (current.avg_quality * own_weight + child_quality) / total_weight
                     )
             current.visits += 1
             current = current.parent

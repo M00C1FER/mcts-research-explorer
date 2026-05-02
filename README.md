@@ -49,7 +49,7 @@ print(explorer.get_tree_summary())
 
 ## API Reference
 
-### `MCTSResearchExplorer(search_fn, expand_fn=None, score_fn=None, max_nodes=200, max_depth=4, prune_threshold=0.40)`
+### `MCTSResearchExplorer(search_fn, expand_fn=None, score_fn=None, max_nodes=200, max_depth=4, prune_threshold=0.40, exploration_constant=1.414)`
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -59,6 +59,7 @@ print(explorer.get_tree_summary())
 | `max_nodes` | `int` | Maximum tree nodes (memory bound) |
 | `max_depth` | `int` | Maximum query depth |
 | `prune_threshold` | `float` | Remove branches below this quality score |
+| `exploration_constant` | `float` | UCB1 `C` weight (default `√2 ≈ 1.414`). Higher → more exploration |
 
 ### `explorer.explore(topic, budget=50, initial_queries=None) -> Dict`
 
@@ -132,10 +133,34 @@ MCTSResearchExplorer
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| Linux | ✅ | Full support |
-| WSL (Windows) | ✅ | Full support |
-| Termux (Android) | ✅ | Full support, no sudo required |
+| Debian 12/13, Ubuntu 22.04/24.04 | ✅ | Full support — `apt` auto-install |
+| Arch / Manjaro | ✅ | Full support — `pacman` auto-install |
+| Fedora / RHEL / Rocky | ✅ | Full support — `dnf` auto-install |
+| Alpine Linux | ✅ | Full support — `apk` auto-install (`py3-pip`) |
+| WSL 2 (Ubuntu base) | ✅ | Full support — no EFI or OS-specific assumptions |
+| Termux (Android arm64) | ✅ | No sudo required; uses `--user` pip install |
 | macOS | ✅ | Full support |
+
+### Termux (Android) Quick Install
+
+```bash
+pkg install python git
+git clone https://github.com/M00C1FER/mcts-research-explorer
+cd mcts-research-explorer
+./install.sh          # detects Termux automatically; no sudo needed
+python3 examples/demo.py
+```
+
+### Alpine Quick Install
+
+```bash
+apk add python3 py3-pip git
+git clone https://github.com/M00C1FER/mcts-research-explorer
+cd mcts-research-explorer
+./install.sh
+source .venv/bin/activate
+python examples/demo.py
+```
 
 ## License
 

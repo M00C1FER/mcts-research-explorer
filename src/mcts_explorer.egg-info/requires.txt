@@ -1,7 +1,0 @@
-
-[dev]
-pytest>=7
-pytest-cov
-
-[http]
-httpx>=0.24
