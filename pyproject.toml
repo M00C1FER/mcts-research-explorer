@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "mcts-explorer"
+version = "1.0.0"
+description = "MCTS-guided research query exploration with UCB1 selection and CRAAP scoring"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov"]
+http = ["httpx>=0.24"]
+
+[project.scripts]
+mcts-explorer = "mcts_explorer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

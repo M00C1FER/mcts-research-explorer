@@ -1,0 +1,4 @@
+# mcts-explorer: no runtime dependencies (pure stdlib + dataclasses)
+# Optional extras:
+# httpx>=0.24       # for async HTTP-based search_fn
+# requests>=2.28    # for sync HTTP-based search_fn
