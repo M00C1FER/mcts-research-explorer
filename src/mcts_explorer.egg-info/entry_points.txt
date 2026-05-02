@@ -1,0 +1,2 @@
+[console_scripts]
+mcts-explorer = mcts_explorer.cli:main
