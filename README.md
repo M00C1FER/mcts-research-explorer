@@ -106,8 +106,10 @@ def search_fn(query: str) -> List[Dict[str, Any]]:
 import httpx
 
 def searxng_search(query: str):
+    import os
+    searxng_url = os.environ.get("SEARXNG_URL", "http://localhost:8080")
     resp = httpx.get(
-        "http://localhost:8080/search",
+        f"{searxng_url}/search",
         params={"q": query, "format": "json"},
         timeout=10
     )
