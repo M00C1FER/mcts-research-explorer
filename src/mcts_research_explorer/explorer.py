@@ -15,6 +15,7 @@ Inspired by:
   - STORM's multi-perspective exploration
 """
 
+import collections
 import math
 import time
 import logging
@@ -302,10 +303,10 @@ class MCTSResearchExplorer:
         """Breadth-first traversal of all nodes."""
         if not self.root:
             return []
-        queue = [self.root]
+        queue: collections.deque = collections.deque([self.root])
         nodes = []
         while queue:
-            node = queue.pop(0)
+            node = queue.popleft()
             nodes.append(node)
             queue.extend(node.children)
         return nodes
